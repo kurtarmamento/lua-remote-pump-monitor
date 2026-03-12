@@ -3,6 +3,7 @@ state_machine.lua
 
 Takes the current simulator and returns the current state
 ]]
+
 local StateMachine = {}
 StateMachine.__index = StateMachine
 
@@ -12,12 +13,17 @@ function StateMachine.new(config)
     self.config = config
     self.current_state = "IDLE"
     self.starting_ticks = 0
+    self.reset_requested = false
 
     return self
 end
 
 function StateMachine:get_state()
     return self.current_state
+end
+
+function StateMachine:request_reset()
+    self.reset_requested = true
 end
 
 function StateMachine:update(snapshot)
@@ -79,7 +85,13 @@ function StateMachine:update(snapshot)
         end
 
     elseif state == "LOCKOUT" then
+        if self.reset_requested and not pump_on then
+            self.current_state = "IDLE"
+            self.starting_ticks = 0
+        end
     end
+
+    self.reset_requested = false
 end
 
 return StateMachine

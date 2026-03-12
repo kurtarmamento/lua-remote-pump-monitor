@@ -78,6 +78,10 @@ function Simulator:set_valve_command(value)
     self.state.valve_command = value
 end
 
+function Simulator:set_pressure_target(value)
+    self.state.pressure_target = value
+end
+
 function Simulator:set_network_online(value)
     self.state.network_online = value
 end

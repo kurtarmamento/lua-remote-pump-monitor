@@ -12,6 +12,7 @@ local config = {
         max_level_pct = 100,
         drain_per_tick_pct = 0.8,
         clear_margin_pct = 5,
+        start_permit_level_pct = 25,
     },
 
     pressure = {
@@ -21,6 +22,8 @@ local config = {
         discharge_running_kpa = 220,
         blocked_line_extra_kpa = 30,
         clear_margin_kpa = 10,
+        min_target_kpa = 150,
+        max_target_kpa = 260,
     },
 
     flow = {
