@@ -1,184 +1,152 @@
+--[[
+main.lua
+
+Main loop
+]]
+
+local socket = require("socket")
+local mqtt = require("mqtt")
+
 local config = require("config")
 local Simulator = require("simulator")
 local StateMachine = require("state_machine")
 local AlarmEngine = require("alarms")
 local CommandHandler = require("commands")
+local MqttClient = require("mqtt_client")
 
-local function format_alarm_list(active_alarms)
-    if #active_alarms == 0 then
-        return "none"
-    end
+local sim = Simulator.new(config)
+local sm = StateMachine.new(config)
+local alarms = AlarmEngine.new(config)
+local commands = CommandHandler.new(config)
+local mqttc = MqttClient.new(config)
 
-    local parts = {}
-    for _, alarm in ipairs(active_alarms) do
-        table.insert(parts, alarm.id .. " (" .. alarm.severity .. ")")
-    end
+local tick_count = 0
+local last_tick_at = socket.gettime()
 
-    return table.concat(parts, ", ")
+local current_snapshot = sim:get_snapshot()
+local current_state = sm:get_state()
+local current_active_alarms = {}
+
+local function recompute()
+    current_snapshot = sim:get_snapshot()
+
+    sm:update(current_snapshot)
+    current_state = sm:get_state()
+
+    alarms:update(current_snapshot, current_state)
+    current_active_alarms = alarms:get_active_alarms()
+
+    return alarms:get_recent_events()
 end
 
-local function format_event_list(events)
-    local parts = {}
-
+local function publish_alarm_events(events)
     for _, event in ipairs(events.raised) do
-        table.insert(parts, "RAISED: " .. event.id)
+        mqttc:publish_alarm_event(event, "RAISED")
     end
 
     for _, event in ipairs(events.cleared) do
-        table.insert(parts, "CLEARED: " .. event.id)
+        mqttc:publish_alarm_event(event, "CLEARED")
     end
-
-    if #parts == 0 then
-        return "none"
-    end
-
-    return table.concat(parts, ", ")
 end
 
-local function format_command_result(command_result)
-    if not command_result then
-        return "none"
-    end
+local function process_incoming_commands()
+    local queued = mqttc:pop_pending_commands()
 
-    return string.format(
-        "%s -> accepted=%s, reason=%s",
-        command_result.command,
-        tostring(command_result.accepted),
-        command_result.reason
-    )
-end
+    for _, cmd in ipairs(queued) do
+        local command_name = cmd.command
+        local payload = cmd.payload or {}
 
-local function print_snapshot(label, tick, state_name, active_alarms, events, command_result, s)
-    print(label .. " - Tick " .. tick)
-    print(("  system_state:     %s"):format(state_name))
-    print(("  active_alarms:    %s"):format(format_alarm_list(active_alarms)))
-    print(("  alarm_events:     %s"):format(format_event_list(events)))
-    print(("  command_result:   %s"):format(format_command_result(command_result)))
-    print(("  tank_level_pct:   %.1f"):format(s.tank_level_pct))
-    print(("  suction_kpa:      %.1f"):format(s.suction_kpa))
-    print(("  discharge_kpa:    %.1f"):format(s.discharge_kpa))
-    print(("  flow_lpm:         %.1f"):format(s.flow_lpm))
-    print(("  supply_voltage_v: %.1f"):format(s.supply_voltage_v))
-    print(("  pressure_target:  %.1f"):format(s.pressure_target))
-    print(("  pump_feedback:    %s"):format(tostring(s.pump_feedback)))
-    print(("  valve_feedback:   %s"):format(tostring(s.valve_feedback)))
-    print(("  network_online:   %s"):format(tostring(s.network_online)))
-    print("")
-end
-
-local function run_scenario(scenario)
-    local sim = Simulator.new(config)
-    local sm = StateMachine.new(config)
-    local alarms = AlarmEngine.new(config)
-    local commands = CommandHandler.new(config)
-
-    scenario.setup(sim)
-
-    for tick = 1, scenario.ticks do
-        sim:update()
-        local snapshot = sim:get_snapshot()
-
-        if scenario.inject then
-            scenario.inject(tick, snapshot, sim)
-        end
-
-        sm:update(snapshot)
-        local state_name = sm:get_state()
-
-        alarms:update(snapshot, state_name)
-        local active_alarms = alarms:get_active_alarms()
-        local events = alarms:get_recent_events()
-
-        local command_result = nil
-        if scenario.commands and scenario.commands[tick] then
-            local cmd = scenario.commands[tick]
-            command_result = commands:execute(
-                cmd.name,
-                cmd.payload,
-                snapshot,
-                state_name,
-                active_alarms,
+        if not command_name then
+            print("Ignoring command without `command` field")
+        else
+            local result = commands:execute(
+                command_name,
+                payload,
+                current_snapshot,
+                current_state,
+                current_active_alarms,
                 sim,
                 sm
             )
 
+            -- Apply one plant update after command so result is reflected in state/telemetry
             sim:update()
-            snapshot = sim:get_snapshot()
+            recompute()
 
-            sm:update(snapshot)
-            state_name = sm:get_state()
+            mqttc:publish_command_result(result, current_state)
+            mqttc:publish_state(current_snapshot, current_state)
+            mqttc:publish_telemetry(current_snapshot, current_state, current_active_alarms)
 
-            alarms:update(snapshot, state_name)
-            active_alarms = alarms:get_active_alarms()
-            events = alarms:get_recent_events()
+            print(string.format(
+                "Command processed: %s accepted=%s reason=%s",
+                result.command,
+                tostring(result.accepted),
+                tostring(result.reason)
+            ))
         end
-
-        print_snapshot(scenario.label, tick, state_name, active_alarms, events, command_result, snapshot)
     end
 end
 
-local scenarios = {
-    {
-        label = "Scenario A: Valid Start Command",
-        ticks = 5,
-        setup = function(sim)
-            sim:set_pump_command(false)
-            sim:set_valve_command(true)
-        end,
-        commands = {
-            [1] = { name = "START_PUMP" },
-        },
-    },
-    {
-        label = "Scenario B: Start Rejected For Low Tank",
-        ticks = 3,
-        setup = function(sim)
-            sim:set_pump_command(false)
-            sim:set_valve_command(true)
-        end,
-        inject = function(tick, snapshot)
-            snapshot.tank_level_pct = 18
-        end,
-        commands = {
-            [1] = { name = "START_PUMP" },
-        },
-    },
-    {
-        label = "Scenario C: Pressure Target Updated",
-        ticks = 4,
-        setup = function(sim)
-            sim:set_pump_command(true)
-            sim:set_valve_command(true)
-        end,
-        commands = {
-            [2] = { name = "SET_PRESSURE_TARGET", payload = { value = 210 } },
-        },
-    },
-    {
-        label = "Scenario D: Valve Open Rejected During Critical Fault",
-        ticks = 4,
-        setup = function(sim)
-            sim:set_pump_command(true)
-            sim:set_valve_command(false)
-        end,
-        commands = {
-            [2] = { name = "OPEN_VALVE" },
-        },
-    },
-    {
-        label = "Scenario E: Reset After Fault Lockout",
-        ticks = 6,
-        setup = function(sim)
-            sim:set_pump_command(true)
-            sim:set_valve_command(false)
-        end,
-        commands = {
-            [2] = { name = "STOP_PUMP" },
-            [4] = { name = "RESET_FAULT" },
-        },
-    },
-}
+local function inject_demo_faults(snapshot, tick)
+    -- Optional demo hooks. Uncomment one at a time.
 
-for _, scenario in ipairs(scenarios) do
-    run_scenario(scenario)
+    -- Low tank after 15 ticks:
+    -- if tick >= 15 then
+    --     snapshot.tank_level_pct = 18
+    -- end
+
+    -- Low voltage after 25 ticks:
+    -- if tick >= 25 then
+    --     snapshot.supply_voltage_v = 11.2
+    -- end
+
+    -- Simulate blocked discharge after 35 ticks:
+    -- if tick >= 35 then
+    --     sim:set_valve_command(false)
+    -- end
 end
+
+local function simulation_loop()
+    -- Always process inbound MQTT commands as soon as they arrive
+    process_incoming_commands()
+
+    local now = socket.gettime()
+    if (now - last_tick_at) < config.tick_seconds then
+        return
+    end
+
+    last_tick_at = now
+    tick_count = tick_count + 1
+
+    sim:update()
+    current_snapshot = sim:get_snapshot()
+
+    inject_demo_faults(current_snapshot, tick_count)
+
+    local events = recompute()
+
+    mqttc:publish_state(current_snapshot, current_state)
+
+    if tick_count % 3 == 0 then
+        mqttc:publish_telemetry(current_snapshot, current_state, current_active_alarms)
+    end
+
+    publish_alarm_events(events)
+
+    print(string.format(
+        "Tick=%d state=%s flow=%.1f discharge=%.1f tank=%.1f alarms=%d",
+        tick_count,
+        current_state,
+        current_snapshot.flow_lpm,
+        current_snapshot.discharge_kpa,
+        current_snapshot.tank_level_pct,
+        #current_active_alarms
+    ))
+end
+
+-- Seed initial view before the broker loop starts
+recompute()
+
+print("Starting MQTT + simulation loop")
+-- luamqtt documents that run_ioloop can run MQTT clients and custom loop functions together.
+mqtt.run_ioloop(mqttc.client, simulation_loop)

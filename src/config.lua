@@ -52,6 +52,20 @@ local config = {
             low_voltage = 2,
             comms_lost = 1,
         }
+    },
+
+    mqtt = {
+    uri = "127.0.0.1",
+    client_id = "pump-sim-001",
+    asset_id = "PUMP-001",
+
+    topics = {
+        state = "pump/PUMP-001/state",
+        telemetry = "pump/PUMP-001/telemetry",
+        alarms = "pump/PUMP-001/alarms",
+        command_result = "pump/PUMP-001/command_result",
+        commands = "pump/PUMP-001/commands"
+    }
     }
 }
 
