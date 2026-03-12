@@ -11,6 +11,7 @@ local config = {
         min_level_pct = 20,
         max_level_pct = 100,
         drain_per_tick_pct = 0.8,
+        clear_margin_pct = 5,
     },
 
     pressure = {
@@ -19,6 +20,7 @@ local config = {
         discharge_idle_kpa = 10,
         discharge_running_kpa = 220,
         blocked_line_extra_kpa = 30,
+        clear_margin_kpa = 10,
     },
 
     flow = {
@@ -31,13 +33,23 @@ local config = {
         nominal_v = 12.5,
         running_v = 12.2,
         low_v = 11.5,
+        clear_margin_v = 0.3,
     },
 
     state_machine = {
         startup_ticks_required = 2,
         fault_discharge_kpa = 240,
-    }
+    },
 
+    alarms = {
+        debounce_ticks = {
+            low_tank = 2,
+            no_flow = 2,
+            overpressure = 1,
+            low_voltage = 2,
+            comms_lost = 1,
+        }
+    }
 }
 
 return config
