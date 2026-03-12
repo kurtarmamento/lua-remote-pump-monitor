@@ -14,6 +14,7 @@ function StateMachine.new(config)
     self.current_state = "IDLE"
     self.starting_ticks = 0
     self.reset_requested = false
+    self.fault_requires_reset = false
 
     return self
 end
@@ -48,12 +49,14 @@ function StateMachine:update(snapshot)
 
         elseif high_pressure_fault then
             self.current_state = "FAULT"
+            self.fault_requires_reset = true
 
         else
             self.starting_ticks = self.starting_ticks + 1
 
             if flow_ok and valve_open and self.starting_ticks >= c.state_machine.startup_ticks_required then
                 self.current_state = "RUNNING"
+                print("here")
             end
         end
 
@@ -63,6 +66,7 @@ function StateMachine:update(snapshot)
 
         elseif high_pressure_fault then
             self.current_state = "FAULT"
+            self.fault_requires_reset = true
 
         elseif not flow_ok then
             self.current_state = "WARNING"
@@ -74,6 +78,7 @@ function StateMachine:update(snapshot)
 
         elseif high_pressure_fault then
             self.current_state = "FAULT"
+            self.fault_requires_reset = true
 
         elseif flow_ok and valve_open then
             self.current_state = "RUNNING"
@@ -81,13 +86,18 @@ function StateMachine:update(snapshot)
 
     elseif state == "FAULT" then
         if not pump_on then
-            self.current_state = "LOCKOUT"
+            if self.fault_requires_reset then
+                self.current_state = "LOCKOUT"
+            else
+                self.current_state = "IDLE"
+            end
         end
 
     elseif state == "LOCKOUT" then
         if self.reset_requested and not pump_on then
             self.current_state = "IDLE"
             self.starting_ticks = 0
+            self.fault_requires_reset = false
         end
     end
 

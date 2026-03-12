@@ -87,25 +87,6 @@ local function process_incoming_commands()
     end
 end
 
-local function inject_demo_faults(snapshot, tick)
-    -- Optional demo hooks. Uncomment one at a time.
-
-    -- Low tank after 15 ticks:
-    -- if tick >= 15 then
-    --     snapshot.tank_level_pct = 18
-    -- end
-
-    -- Low voltage after 25 ticks:
-    -- if tick >= 25 then
-    --     snapshot.supply_voltage_v = 11.2
-    -- end
-
-    -- Simulate blocked discharge after 35 ticks:
-    -- if tick >= 35 then
-    --     sim:set_valve_command(false)
-    -- end
-end
-
 local function simulation_loop()
     -- Always process inbound MQTT commands as soon as they arrive
     process_incoming_commands()
@@ -120,8 +101,6 @@ local function simulation_loop()
 
     sim:update()
     current_snapshot = sim:get_snapshot()
-
-    inject_demo_faults(current_snapshot, tick_count)
 
     local events = recompute()
 
