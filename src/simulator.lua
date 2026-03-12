@@ -1,8 +1,5 @@
---[[
-    simulator.lua
-
-  Simulate a real pump
-]]
+-- simulator.lua
+-- Handles pump simulation
 
 local Simulator = {}
 Simulator.__index = Simulator

@@ -1,8 +1,5 @@
---[[
-state_machine.lua
-
-Takes the current simulator and returns the current state
-]]
+-- state_machine.lua
+-- Returns state for current simulation state
 
 local StateMachine = {}
 StateMachine.__index = StateMachine
@@ -56,7 +53,6 @@ function StateMachine:update(snapshot)
 
             if flow_ok and valve_open and self.starting_ticks >= c.state_machine.startup_ticks_required then
                 self.current_state = "RUNNING"
-                print("here")
             end
         end
 

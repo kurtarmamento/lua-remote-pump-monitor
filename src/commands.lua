@@ -1,8 +1,5 @@
---[[
-commands.lua
-
-Handles commands made to alter pump behaviour
-]]
+-- commands.lua
+-- Handles commands received
 
 local CommandHandler = {}
 CommandHandler.__index = CommandHandler

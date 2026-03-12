@@ -1,8 +1,5 @@
---[[
-config.lua
-
-Holds adjustable parameters simulating a real pump system
-]]
+-- config.lua
+-- Holds configurable parameters
 
 local config = {
     tick_seconds = 1,

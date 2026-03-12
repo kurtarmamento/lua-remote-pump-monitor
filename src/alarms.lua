@@ -1,8 +1,5 @@
---[[
-alarms.lua
-
-Raise alarms with faults
-]]
+-- alarms.lua
+-- Handles alarms given the current state
 
 local AlarmEngine = {}
 AlarmEngine.__index = AlarmEngine

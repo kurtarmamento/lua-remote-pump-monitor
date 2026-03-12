@@ -1,8 +1,5 @@
---[[
-mqtt_client.lua
-
-Handle mqtt
-]]
+-- mqtt_client.lua
+-- Publishes current state
 
 local mqtt = require("mqtt")
 local json = require("dkjson")

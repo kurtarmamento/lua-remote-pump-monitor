@@ -1,8 +1,5 @@
---[[
-main.lua
-
-Main loop
-]]
+-- main.lua
+-- Main loop of simulator
 
 local socket = require("socket")
 local mqtt = require("mqtt")

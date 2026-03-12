@@ -1,7 +1,5 @@
---[[
-send_command.lua
-
-]]
+-- send_command.lua
+-- Used to publish commands to the pump simulation
 
 local mqtt = require("mqtt")
 local json = require("dkjson")

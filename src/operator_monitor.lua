@@ -1,8 +1,5 @@
---[[
-operator_monitor.lua
-
-
-]]
+-- operator_monitor.lua
+-- Subscribes to the pump telemetry and prints in a readable format
 
 local mqtt = require("mqtt")
 local json = require("dkjson")
