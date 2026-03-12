@@ -24,13 +24,20 @@ local config = {
     flow = {
         idle_lpm = 0,
         running_lpm = 180,
+        running_threshold_lpm = 50,
     },
 
     voltage = {
         nominal_v = 12.5,
         running_v = 12.2,
         low_v = 11.5,
+    },
+
+    state_machine = {
+        startup_ticks_required = 2,
+        fault_discharge_kpa = 240,
     }
+
 }
 
 return config

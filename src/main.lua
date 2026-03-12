@@ -6,9 +6,11 @@ Run the simulator
 
 local config = require("config")
 local Simulator = require("simulator")
+local StateMachine = require("state_machine")
 
-local function print_snapshot(label, tick, s)
+local function print_snapshot(label, tick, state_name, s)
     print(label .. " - Tick " .. tick)
+    print(("  system_state:     %s"):format(state_name))
     print(("  tank_level_pct:   %.1f"):format(s.tank_level_pct))
     print(("  suction_kpa:      %.1f"):format(s.suction_kpa))
     print(("  discharge_kpa:    %.1f"):format(s.discharge_kpa))
@@ -24,15 +26,20 @@ end
 
 local function run_scenario(label, pump_on, valve_open, ticks)
     local sim = Simulator.new(config)
+    local sm = StateMachine.new(config)
+
     sim:set_pump_command(pump_on)
     sim:set_valve_command(valve_open)
 
     for tick = 1, ticks do
         sim:update()
-        print_snapshot(label, tick, sim:get_snapshot())
+        local snapshot = sim:get_snapshot()
+        sm:update(snapshot)
+
+        print_snapshot(label, tick, sm:get_state(), snapshot)
     end
 end
 
 run_scenario("Scenario A: Pump OFF, Valve CLOSED", false, false, 3)
 run_scenario("Scenario B: Pump ON, Valve OPEN", true, true, 5)
-run_scenario("Scenario C: Pump ON, Valve CLOSED", true, false, 3)
+run_scenario("Scenario C: Pump ON, Valve CLOSED", true, false, 5)
